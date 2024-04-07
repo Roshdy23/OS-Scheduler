@@ -65,3 +65,12 @@ void destroyClk(bool terminateAll)
         killpg(getpgrp(), SIGINT);
     }
 }
+
+
+struct process
+{
+int id ;
+int arrival_time;
+int runtime;
+int priority;
+};
