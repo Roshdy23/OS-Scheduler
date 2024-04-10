@@ -66,11 +66,94 @@ void destroyClk(bool terminateAll)
     }
 }
 
-
-struct process
-{
-int id ;
-int arrival_time;
-int runtime;
-int priority;
+enum ProcessState{
+    ready,
+    running,
+    blocked,
+    terminated
 };
+
+struct Process
+{
+    int id ;
+    int arrival_time;
+    int runtime;
+    int priority;
+    int remainingTime;
+    enum ProcessState state;
+};
+
+struct ProcessNode
+{
+    struct Process process;
+    struct ProcessNode* next;
+};
+
+//-------------------------- RR headers ------------------------//
+
+struct CircularQueue
+{
+    struct ProcessNode* front;
+    struct ProcessNode* rear;
+};
+
+void initializeCircularQueue(struct CircularQueue* q){
+    q->front=NULL;
+    q->rear=NULL;
+}
+
+void enqueueInCQ (struct CircularQueue* q,struct Process p){
+    struct ProcessNode* newProcess; 
+    newProcess = (struct ProcessNode*) malloc (sizeof(struct ProcessNode));
+    newProcess->process=p;
+    newProcess->next=NULL;
+
+    if(q->front==NULL && q->rear==NULL){   //if empty queue
+        q->front=newProcess;
+        (q->front)->next=q->front;
+        q->rear=q->front;
+        // printf("process enqueued");
+    }
+    else{
+    q->rear->next=newProcess;
+    q->rear=newProcess;
+    (q->rear)->next=q->front;
+    // printf("process enqueued");
+    }
+}
+
+struct Process dequeueOFCQ(struct CircularQueue* q){
+    if(q->front!=NULL){
+    struct ProcessNode* n=q->front;
+    struct Process p=(q->front)->process;
+
+    if (q->front == q->rear){
+        q->front=NULL;
+        q->rear=NULL;
+    }
+    else{
+        (q->rear)->next=(q->front)->next;
+        q->front=(q->front)->next;
+    }
+    free(n);
+    return p;
+    }
+}
+
+void displayCQ(struct CircularQueue q){
+    struct ProcessNode* it=q.front;
+    while(it!=NULL && it!=q.rear){
+        printf("processID:%d\n",(it->process).id);
+        it=it->next;
+    }
+    if (it != NULL)
+        printf("processID:%d\n", (it->process).id);
+    return ;
+}
+
+bool isEmpty(struct CircularQueue q){
+    if(q.front==NULL && q.rear==NULL)
+        return true;
+    else 
+        return false;
+}
