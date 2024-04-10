@@ -9,7 +9,8 @@ int numofProcesses=0;
 int algorithm=-1;
 int qtm=-1;
 
-int scheduler_id,clk_id;
+int scheduler_id,clk_id,sigshmid;
+int *sigshmaddr;
 
 void clearResources(int signum)
 {
@@ -124,42 +125,55 @@ void choose_scheduling_algo()
     return ;
 }
 
-void create_scheduler()
+
+
+void create_clock_and_scheduler()
 {
 
-    scheduler_id= fork();
-
-    if(scheduler_id==-1)
+    for(int i=0; i < 2 ; i++)
     {
-        printf("error in creating scheduler\n");
-        return;
-    }
+        int pidd= fork();
 
-    if(scheduler_id==0)
-    {
-    char algstr[20];
-    char qtmstr[20];
-    char numofp[20];
+        if(pidd==-1) printf("error\n");
+
+        if(pidd==0)
+        {
+            if(i==0)
+            {
+                execl("./clk.out", "clk.out", NULL);
+            }
+            else
+            
+            {
+                     char algstr[10];
+    char qtmstr[10];
+    char numofp[10];
     sprintf(algstr,"%d",algorithm);
     sprintf(qtmstr,"%d",qtm);
     sprintf(numofp,"%d",numofProcesses);
-    execl("./scheduler.out", "scheduler.out", algorithm, qtm, numofProcesses, NULL);
+
+    
+            execl("./scheduler.out", "scheduler.out",algstr,qtmstr,numofp,NULL);
+   
+            }
+        }
+        else
+        
+        {
+            if(i==0)
+            {
+                clk_id=pidd;
+            }
+            else
+            {
+                scheduler_id=pidd;
+            }
+        }
     }
+
 }
 
-void create_clock()
-{
 
-    clk_id=fork();
-
-    if(clk_id==-1)
-    {
-        printf("error in creating clock\n");
-        return;
-    }
-    if(clk_id==0)
-    execl("./clk.out", "clk.out", NULL);
-}
 
 int main(int argc, char * argv[])
 {
@@ -168,8 +182,8 @@ int main(int argc, char * argv[])
     readFile();// 1. Read the input files. (done)
 
     choose_scheduling_algo();   
-    create_clock();                                     // 2. Ask the user for the chosen scheduling algorithm and its parameters, if there are any. (done)
-    create_scheduler();                                 // 3. Initiate and create the scheduler and clock processes.
+    create_clock_and_scheduler();                                     // 2. Ask the user for the chosen scheduling algorithm and its parameters, if there are any. (done)
+    // create_scheduler();                                 // 3. Initiate and create the scheduler and clock processes.
                                                         // 4. Use this function after creating the clock process to initialize clock
     initClk();
     // To get time use this
@@ -180,6 +194,9 @@ int main(int argc, char * argv[])
     // 6. Send the information to the scheduler at the appropriate time.
     // 7. Clear clock resources
 
+
+
+
         key_t key = ftok("key", 'p');
         msgqid = msgget(key, 0666 | IPC_CREAT);// this message queue will comunicate process generator with scheduler
 
@@ -187,8 +204,8 @@ int main(int argc, char * argv[])
 
         while(it<numofProcesses)
         {
-            
-            while(it<numofProcesses&&(processes+it)->arrival_time==getClk())
+            int clknow=getClk();
+            while(it<numofProcesses&&(processes+it)->arrival_time==clknow)
             {   
                  msgsnd(msgqid, &processes[it], sizeof(struct process), 0);
 
@@ -196,6 +213,10 @@ int main(int argc, char * argv[])
             }
 
         }
-    destroyClk(true);
+
+           int status;
+    waitpid(scheduler_id, &status, 0);
+        printf("Child process finished with status %d\n", status);
+    // destroyClk(true);
 }
 
