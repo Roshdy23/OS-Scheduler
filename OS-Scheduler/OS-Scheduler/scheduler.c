@@ -97,7 +97,6 @@ void contProcess(struct Process *p)
     kill(p->pid, SIGCONT);
 }
 
-
 //------------------------RR algorithm-----------------------------------//
 void RR(int quantum)
 {
