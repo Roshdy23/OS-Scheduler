@@ -61,7 +61,7 @@ void readFile()
 
         int id, arrival, runtime, priority;
         sscanf(line, "%d %d %d %d", &id, &arrival, &runtime, &priority);
-
+       
         (processes + i)->id = id;
 
         (processes + i)->arrival_time = arrival;
@@ -188,24 +188,24 @@ int main(int argc, char *argv[])
     while (it < numofProcesses)
     {
         int clknow = getClk();
-        while (it < numofProcesses && ((processes + it)->arrival_time == clknow))
+        if (it < numofProcesses && ((processes + it)->arrival_time == clknow))
         {
-
-            int val = msgsnd(msgqid, &(processes[it]), sizeof(struct Process), !IPC_NOWAIT);
+            clknow = getClk();
+            int val = msgsnd(msgqid, &(processes[it]), sizeof(struct Process), 0);
             if (val == -1)
             {
                 printf("Error while sending a process to the scheduler\n");
             }
             else
             {
-                printf("sent a process to scheduler\n");
+                // printf("sent a process to scheduler at %d \n", clknow);
             }
             it++;
         }
-
-        int status;
-        waitpid(scheduler_id, &status, 0);
-        printf("Child process finished with status %d\n", status);
-        destroyClk(true);
     }
+
+    int status;
+    waitpid(scheduler_id, &status, 0);
+    printf("Child process finished with status %d\n", status);
+    destroyClk(true);
 }

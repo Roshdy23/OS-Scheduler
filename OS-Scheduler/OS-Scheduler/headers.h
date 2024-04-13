@@ -143,7 +143,7 @@ struct Process *dequeueOFCQ(struct CircularQueue *q)
             q->front = (q->front)->next;
             n->next = NULL;
         }
-        free(n);
+        //free(n);
         return p;
     }
     else
@@ -153,6 +153,8 @@ struct Process *dequeueOFCQ(struct CircularQueue *q)
 void displayCQ(struct CircularQueue q)
 {
     struct ProcessNode *it = q.front;
+    if (!q.front)
+        printf("the queue is empty");
     while (it != NULL && it != q.rear)
     {
         printf("processID:%d\n", (it->process)->id);
