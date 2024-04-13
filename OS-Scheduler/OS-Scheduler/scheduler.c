@@ -1,6 +1,8 @@
 #include "headers.h"
 
+
 void RR(int quantum);
+void HPF();
 int quantum;
 struct CircularQueue readyQueue; // queue to store arrived processes
 
@@ -47,6 +49,9 @@ int main(int argc, char *argv[])
 
     switch (algorithm)
     {
+    case 1:
+        HPF();
+        break;
     case 2:
         RR(quantum);
         break;
@@ -190,5 +195,11 @@ void RR(int quantum)
 
         printf("%d\n", currentTime);
     }
+}
+
+//---------------------HPF---------------------------------------------
+void HPF()
+{
+
 }
 //---------------------------------------------------------------//

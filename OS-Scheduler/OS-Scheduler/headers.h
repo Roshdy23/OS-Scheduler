@@ -172,3 +172,82 @@ bool isEmpty(struct CircularQueue q)
     else
         return false;
 }
+
+//------------------------------------------------------------
+
+// -----------------------------------------Priority Queue Data Structure ------------------------------
+
+struct priority_Queue {
+struct ProcessNode* front;
+};
+
+void initializePriorityQueue(struct priority_Queue *q)
+{
+    q->front = NULL;
+    
+}
+// enqueue dequeue peek isempty display 
+
+void priority_enqueue(struct priority_Queue *q, struct Process *p)
+{
+   struct ProcessNode *newProcess;
+    newProcess = (struct ProcessNode *)malloc(sizeof(struct ProcessNode));
+    newProcess->process = p;
+    newProcess->next = NULL;
+
+    if(q->front==NULL||q->front->process->priority>newProcess->process->priority)
+    {
+        newProcess->next=q->front;
+        q->front=newProcess;
+    }
+    else
+    {
+        struct ProcessNode* temp=q->front;
+
+        while(temp->next&&temp->next->process->priority<=p->priority)temp=temp->next;
+        newProcess->next=temp->next;
+        temp->next=newProcess;
+    }
+}
+
+struct Process* priority_peek(struct priority_Queue *q)
+{
+    if(q->front)return q->front->process;
+    else return NULL;
+}
+
+struct Process* priority_dequeue(struct priority_Queue *q)
+{
+    if(q->front)
+    {
+        struct  Process* temp= q->front->process;
+        struct ProcessNode* temp2=q->front;
+        q->front=q->front->next;
+        free(temp2);
+        return temp;
+    }
+    return NULL;
+
+}
+
+
+bool priority_isempty(struct priority_Queue *q)
+{
+    return (q->front==NULL);
+}
+
+void priority_display(struct priority_Queue *q)
+{
+    struct ProcessNode* it=q->front;
+
+  
+
+    while(it)
+    {
+        printf("process id = %d , arrival time = %d , priority = %d \n",it->process->priority, it->process->id,it->process->arrival_time);
+        it=it->next;
+        
+    } 
+}
+
+//------------------------------------------------------------------------
