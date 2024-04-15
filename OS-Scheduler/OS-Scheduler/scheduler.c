@@ -6,6 +6,8 @@ void HPF();
 int quantum;
 struct CircularQueue readyQueue; // queue to store arrived processes
 
+
+
 int numofProcesses;             // total number of processes comming from generator
 int recievedProcessesNum = 0;   // number of arrived processes
 int terminatedProcessesNum = 0; // total number of terminated processes
@@ -200,6 +202,94 @@ void RR(int quantum)
 //---------------------HPF---------------------------------------------
 void HPF()
 {
+ printf("executing HPF algorithm\n");
 
+ struct priority_Queue readyQueue;
+ 
+   
+
+    recievedProcesses = (struct Process *)malloc(numofProcesses * sizeof(struct Process));
+    struct Process *recv;
+
+    int currentTime;
+
+    while (true)
+    {
+        // initialize the time
+        currentTime = getClk();
+
+        // if all processes are terminated
+        if (terminatedProcessesNum == numofProcesses)
+            break;
+
+        // check if there is any recieved processes
+        while (currentTime == getClk())
+            if (recievedProcessesNum < numofProcesses)
+            {
+                int val = msgrcv(msgqid, &recievedProcesses[recievedProcessesNum], sizeof(struct Process), 0, IPC_NOWAIT);
+                while (val != -1)
+                {
+                    recv = &recievedProcesses[recievedProcessesNum];
+                    forkProcess(recv);
+                    kill(recv->pid, SIGSTOP);
+                    priority_enqueue(&readyQueue, recv);
+                    recievedProcessesNum++;
+
+                    if (!RunningProcess)
+                    {
+                        
+                        RunningProcess = priority_dequeue(&readyQueue);
+                        contProcess(RunningProcess);
+                        RunningProcess->state = running;
+                    }
+
+                    val = msgrcv(msgqid, &recievedProcesses[recievedProcessesNum], sizeof(struct Process), 0, IPC_NOWAIT);
+                }
+            }
+
+        // running new process
+        if (RunningProcess == NULL)
+        {
+            if (!priority_isempty(&readyQueue))
+            {
+               
+                RunningProcess = priority_dequeue(&readyQueue);
+                contProcess(RunningProcess);
+                RunningProcess->state = running;
+            }
+        }
+        // running process checks
+        else if (RunningProcess->remainingTime == 0 )
+        {
+            // noyify process termination
+            if (RunningProcess->remainingTime == 0)
+            {
+                printf("process with id=%d terminated with %d\n", RunningProcess->id, RunningProcess->remainingTime);
+                RunningProcess->state = terminated;
+                terminatedProcessesNum++;
+                RunningProcess = NULL;
+            }
+            if (!priority_isempty(&readyQueue))
+            {
+                printf("Context switching\n");
+               
+                RunningProcess = priority_dequeue(&readyQueue);
+                RunningProcess->state = running;
+                (*runPshmadd) = RunningProcess->remainingTime;
+                contProcess(RunningProcess);
+            }
+            else
+                RunningProcess = NULL;
+        }
+        // get remainig time 
+        if (RunningProcess != NULL && RunningProcess->remainingTime > 0)
+        {
+            RunningProcess->remainingTime = (*runPshmadd);
+           
+        }
+
+        printf("%d\n", currentTime);
+    }
+    
 }
 //---------------------------------------------------------------//

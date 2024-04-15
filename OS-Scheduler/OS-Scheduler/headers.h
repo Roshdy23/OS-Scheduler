@@ -223,7 +223,8 @@ struct Process* priority_dequeue(struct priority_Queue *q)
         struct  Process* temp= q->front->process;
         struct ProcessNode* temp2=q->front;
         q->front=q->front->next;
-        free(temp2);
+       temp2->next=NULL;
+    
         return temp;
     }
     return NULL;
