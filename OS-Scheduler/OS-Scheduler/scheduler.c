@@ -258,6 +258,8 @@ void HPF() {
                         RunningProcess = priority_dequeue(&readyQueue);
                         contProcess(RunningProcess);
                         RunningProcess->state = running;
+                        RunningProcess->starttime = currentTime;
+                         Outp(0, currentTime, RunningProcess);
                     }
 
                     val = msgrcv(msgqid, &recievedProcesses[recievedProcessesNum], sizeof(struct Process), 0,
@@ -272,6 +274,8 @@ void HPF() {
                 RunningProcess = priority_dequeue(&readyQueue);
                 contProcess(RunningProcess);
                 RunningProcess->state = running;
+                  RunningProcess->starttime = currentTime;
+                Outp(0, currentTime, RunningProcess);
             }
         }
             // running process checks
@@ -281,7 +285,10 @@ void HPF() {
                 printf("process with id=%d terminated with %d\n", RunningProcess->id, RunningProcess->remainingTime);
                 RunningProcess->state = terminated;
                 terminatedProcessesNum++;
-                RunningProcess = NULL;
+               
+                 RunningProcess->finishtime = currentTime;
+                   Outp(3, currentTime, RunningProcess);
+                    RunningProcess = NULL;
             }
             if (!priority_isempty(&readyQueue)) {
                 printf("Context switching\n");
@@ -290,6 +297,8 @@ void HPF() {
                 RunningProcess->state = running;
                 (*runPshmadd) = RunningProcess->remainingTime;
                 contProcess(RunningProcess);
+                RunningProcess->starttime = currentTime;
+                 Outp(0, currentTime, RunningProcess);
             } else
                 RunningProcess = NULL;
         }
