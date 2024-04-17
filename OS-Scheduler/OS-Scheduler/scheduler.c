@@ -158,8 +158,6 @@ void perf() {
     TotalWTA /= numofProcesses;
     TotalWait /= numofProcesses;
     FILE *schedulerperf = fopen("scheduler.perf", "a");
-    fprintf(schedulerperf, "Total run %.2lf\n", TotalRun);
-    fprintf(schedulerperf, "Total Time %.2lf\n", TotalTime);
     TotalRun /= TotalTime;
     TotalRun *= 100;
     fprintf(schedulerperf, "CPU Utilization = %.2lf%%\n", TotalRun);
