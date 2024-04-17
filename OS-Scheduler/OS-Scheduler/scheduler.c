@@ -7,8 +7,16 @@ void HPF();
 
 void SRTN();
 
+void perf();
+
+double squareRoot(double n);
+
+
 int quantum;
 struct CircularQueue readyQueue; // queue to store arrived processes
+
+double TotalWTA, TotalWait, TotalRun, TotalTime;
+
 
 
 
@@ -19,10 +27,9 @@ int algorithm = -1;
 struct Process *RunningProcess = NULL;
 struct Process *min = NULL;
 struct Process *recievedProcesses;
-
 int msgqid, sigshmid;
+double WtaT[500];
 int *sigshmaddr;
-
 int runPshmid; // shared memory for the remain time of the running process
 int *runPshmadd;
 
@@ -31,7 +38,11 @@ int *runPshmadd;
 int main(int argc, char *argv[]) {
     FILE *schedulerlog = fopen("scheduler.log", "w");
     fclose(schedulerlog);
+    FILE *schedulerperf = fopen("scheduler.perf", "w");
+    fclose(schedulerperf);
     initClk();
+    TotalTime = TotalWTA = TotalWait = 0;
+    TotalRun = 0;
     while (getClk() == 0);
     printf("hi from scheduler\n");
 
@@ -69,6 +80,7 @@ int main(int argc, char *argv[]) {
 
     // upon termination release the clock resources.
     // destroyClk(true);
+    perf();
 }
 
 //-----------------------------processes operation functions--------------------//
@@ -129,9 +141,49 @@ void Outp(int op, int time, struct Process *p) {
                 p->remainingTime,
                 time - p->arrival_time - p->runtime + p->remainingTime, p->finishtime - p->arrival_time,
                 (x) / p->runtime);
+        TotalWait += time - p->arrival_time - p->runtime + p->remainingTime;
+        TotalWTA += (x) / p->runtime;
+        TotalRun += p->runtime;
+        WtaT[p->id] = (x) / p->runtime;
     }
     fprintf(schedulerlog, "\n");
     fclose(schedulerlog);
+}
+
+//-------------scheduler.perf output---------//
+
+void perf() {
+    double std = 0;
+
+    TotalWTA /= numofProcesses;
+    TotalWait /= numofProcesses;
+    FILE *schedulerperf = fopen("scheduler.perf", "a");
+    TotalRun /= TotalTime;
+    TotalRun *= 100;
+    fprintf(schedulerperf, "CPU Utilization = %.2lf%%\n", TotalRun);
+    fprintf(schedulerperf, "Avg WTA = %.2lf\n", TotalWTA);
+    fprintf(schedulerperf, "Avg Waiting = %.2lf\n", TotalWait);
+    for (int i = 1; i <= numofProcesses; ++i) {
+        std += (WtaT[i] - TotalWTA)*(WtaT[i] - TotalWTA);
+    }
+    std = squareRoot(std);
+    fprintf(schedulerperf, "Std WTA = %.2lf\n", std);
+    fclose(schedulerperf);
+
+}
+
+//-------------Square root function to calculate std-----------'
+
+double squareRoot(double n) {
+    double x = n;
+    double y = 1;
+    double epsilon = 0.000001;
+
+    while (x - y > epsilon) {
+        x = (x + y) / 2;
+        y = n / x;
+    }
+    return x;
 }
 
 //------------------------ RR algorithm -----------------------------------//
@@ -238,8 +290,10 @@ void HPF() {
         currentTime = getClk();
 
         // if all processes are terminated
-        if (terminatedProcessesNum == numofProcesses)
+        if (terminatedProcessesNum == numofProcesses) {
+            TotalTime = currentTime - 2;
             break;
+        }
 
         // check if there is any recieved processes
         while (currentTime == getClk())
@@ -252,58 +306,37 @@ void HPF() {
                     kill(recv->pid, SIGSTOP);
                     priority_enqueue(&readyQueue, recv, 0);
                     recievedProcessesNum++;
-
-                    if (!RunningProcess) {
-
-                        RunningProcess = priority_dequeue(&readyQueue);
-                        contProcess(RunningProcess);
-                        RunningProcess->state = running;
-                        RunningProcess->starttime = currentTime;
-                         Outp(0, currentTime, RunningProcess);
-                    }
-
                     val = msgrcv(msgqid, &recievedProcesses[recievedProcessesNum], sizeof(struct Process), 0,
                                  IPC_NOWAIT);
                 }
             }
 
         // running new process
-        if (RunningProcess == NULL) {
-            if (!priority_isempty(&readyQueue)) {
 
-                RunningProcess = priority_dequeue(&readyQueue);
-                contProcess(RunningProcess);
-                RunningProcess->state = running;
-                  RunningProcess->starttime = currentTime;
-                Outp(0, currentTime, RunningProcess);
-            }
-        }
-            // running process checks
-        else if (RunningProcess->remainingTime == 0) {
+        if (RunningProcess && RunningProcess->remainingTime == 0) {
             // noyify process termination
             if (RunningProcess->remainingTime == 0) {
                 printf("process with id=%d terminated with %d\n", RunningProcess->id, RunningProcess->remainingTime);
                 RunningProcess->state = terminated;
                 terminatedProcessesNum++;
-               
-                 RunningProcess->finishtime = currentTime;
-                   Outp(3, currentTime, RunningProcess);
-                    RunningProcess = NULL;
+                RunningProcess->finishtime = currentTime;
+                Outp(3, currentTime, RunningProcess);
+                RunningProcess = NULL;
             }
+        }
+        if (!RunningProcess) {
             if (!priority_isempty(&readyQueue)) {
-                printf("Context switching\n");
 
                 RunningProcess = priority_dequeue(&readyQueue);
-                RunningProcess->state = running;
-                (*runPshmadd) = RunningProcess->remainingTime;
                 contProcess(RunningProcess);
+                RunningProcess->state = running;
                 RunningProcess->starttime = currentTime;
-                 Outp(0, currentTime, RunningProcess);
-            } else
-                RunningProcess = NULL;
+                Outp(0, currentTime, RunningProcess);
+            }
         }
-        // get remainig time 
-        if (RunningProcess != NULL && RunningProcess->remainingTime > 0) {
+
+        // get remainig time
+        if (RunningProcess && RunningProcess->remainingTime > 0) {
             RunningProcess->remainingTime = (*runPshmadd);
 
         }
@@ -331,8 +364,10 @@ void SRTN() {
         currentTime = getClk();
 
         // if all processes are terminated
-        if (terminatedProcessesNum == numofProcesses)
+        if (terminatedProcessesNum == numofProcesses) {
+            TotalTime = currentTime - 1;
             break;
+        }
 
         // check if there is any recieved processes
         while (currentTime == getClk())
@@ -346,8 +381,6 @@ void SRTN() {
                     recv->starttime = -1;
                     priority_enqueue(&readyQueue, recv, 1);
                     recievedProcessesNum++;
-
-
                     val = msgrcv(msgqid, &recievedProcesses[recievedProcessesNum], sizeof(struct Process), 0,
                                  IPC_NOWAIT);
                 }
@@ -392,6 +425,19 @@ void SRTN() {
             RunningProcess->state = terminated;
             terminatedProcessesNum++;
             RunningProcess = NULL;
+        }
+        if (RunningProcess == NULL) {
+            if (!priority_isempty(&readyQueue)) {
+                RunningProcess = priority_dequeue(&readyQueue);
+                contProcess(RunningProcess);
+                RunningProcess->state = running;
+                if (RunningProcess->starttime == -1) {
+                    RunningProcess->starttime = currentTime;
+                    Outp(0, currentTime, RunningProcess);
+                } else {
+                    Outp(1, currentTime, RunningProcess);
+                }
+            }
         }
         // get remaining time
         if (RunningProcess != NULL && RunningProcess->remainingTime > 0) {
