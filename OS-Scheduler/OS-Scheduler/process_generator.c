@@ -61,7 +61,7 @@ void readFile()
 
         int id, arrival, runtime, priority;
         sscanf(line, "%d %d %d %d", &id, &arrival, &runtime, &priority);
-       
+        
         (processes + i)->id = id;
 
         (processes + i)->arrival_time = arrival;
@@ -184,7 +184,8 @@ int main(int argc, char *argv[])
     msgqid = msgget(key, 0666 | IPC_CREAT); // this message queue will comunicate process generator with scheduler
 
     int it = 0;
-
+    kill(scheduler_id,SIGCONT);
+    
     while (it < numofProcesses)
     {
         int clknow = getClk();
