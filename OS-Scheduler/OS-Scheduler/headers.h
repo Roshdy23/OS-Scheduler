@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
+#include <math.h>
 
 typedef short bool;
 #define true 1
@@ -76,6 +77,8 @@ struct Process
     int arrival_time;
     int runtime;
     int priority;
+    int finishtime;
+    int starttime;
     int waitingTime;
     int remainingTime;
     int lastStopTime;
@@ -188,25 +191,33 @@ void initializePriorityQueue(struct priority_Queue *q)
 }
 // enqueue dequeue peek isempty display 
 
-void priority_enqueue(struct priority_Queue *q, struct Process *p)
+void priority_enqueue(struct priority_Queue *q, struct Process *p,int op)
 {
    struct ProcessNode *newProcess;
     newProcess = (struct ProcessNode *)malloc(sizeof(struct ProcessNode));
     newProcess->process = p;
     newProcess->next = NULL;
-
-    if(q->front==NULL||q->front->process->priority>newProcess->process->priority)
-    {
-        newProcess->next=q->front;
-        q->front=newProcess;
+    if(op == 0) {
+        if (q->front == NULL || q->front->process->priority > newProcess->process->priority) {
+            newProcess->next = q->front;
+            q->front = newProcess;
+        } else {
+            struct ProcessNode *temp = q->front;
+            while (temp->next && temp->next->process->priority <= p->priority)temp = temp->next;
+            newProcess->next = temp->next;
+            temp->next = newProcess;
+        }
     }
-    else
-    {
-        struct ProcessNode* temp=q->front;
-
-        while(temp->next&&temp->next->process->priority<=p->priority)temp=temp->next;
-        newProcess->next=temp->next;
-        temp->next=newProcess;
+    if(op == 1) {
+        if (q->front == NULL || q->front->process->remainingTime > newProcess->process->remainingTime) {
+            newProcess->next = q->front;
+            q->front = newProcess;
+        } else {
+            struct ProcessNode *temp = q->front;
+            while (temp->next && temp->next->process->remainingTime <= p->remainingTime)temp = temp->next;
+            newProcess->next = temp->next;
+            temp->next = newProcess;
+        }
     }
 }
 
@@ -223,7 +234,8 @@ struct Process* priority_dequeue(struct priority_Queue *q)
         struct  Process* temp= q->front->process;
         struct ProcessNode* temp2=q->front;
         q->front=q->front->next;
-        free(temp2);
+       temp2->next=NULL;
+    
         return temp;
     }
     return NULL;
