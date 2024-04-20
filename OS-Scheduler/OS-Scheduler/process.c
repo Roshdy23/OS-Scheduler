@@ -14,31 +14,34 @@ int main(int agrc, char *argv[])
         perror("Error in creating message queue");
         exit(-1);
     }
-
+    usleep(100); //wait 100microseconds
+    kill(getppid(),SIGCONT);
+        raise(SIGSTOP);
+        usleep(100); //wait 10microseconds
+        kill(getppid(),SIGCONT);
     int *runPshmadd = (int *)shmat(runPshmid, 0, 0); // remainingTime
-(*runPshmadd)=1;
-    raise(SIGSTOP);
-   
+
     // TODO it needs to get the remaining time from somewhere
     int currentTime = getClk();
     int remainingTime = (*runPshmadd);
-
     while (remainingTime > 0)
     {
-       // printf("process %d remainTime=%d\n", getpid(), remainingTime);
-        (*runPshmadd)--;
-        remainingTime = (*runPshmadd);
-
+        //printf("process %d remainTime=%d ", getpid(), remainingTime);
         while (currentTime == getClk()) // wait till the next clk;
             if (remainingTime == 0)
                 break;
-
+        
+        (*runPshmadd)--;
+        remainingTime = (*runPshmadd);
+        // printf("%d",getpid());
+        kill(getppid(),SIGCONT);
+        raise(SIGSTOP);
+        usleep(100); //wait 10microseconds
+        kill(getppid(),SIGCONT);
         currentTime = getClk(); // update the time
     }
 
     destroyClk(false);
-
-    printf("end\n");
 
     return 0;
 }
