@@ -25,13 +25,16 @@ int *sigshmaddr;
 
 int runPshmid; // shared memory for the remain time of the running process
 int *runPshmadd;
-int idealtime;
+double idealtime = 0;
 FILE*pf;
 //-------------------------------main function---------------------------//
 int main(int argc, char *argv[])
 {
-    idealtime=0;
     TotalTime = TotalWTA = TotalWait = TotalRun = 0;
+    FILE *schedulerlog = fopen("scheduler.log", "w");
+    FILE *schedulerperf = fopen("scheduler.perf", "w");
+    fclose(schedulerperf);
+    fclose(schedulerlog);
     pf=fopen("scheduler.log","w");
     if(pf==NULL)
          {printf("error in opening file");}
@@ -66,8 +69,8 @@ int main(int argc, char *argv[])
     case 2:
         RR(quantum);
         break;
-
-    default:
+    case 3:
+        SRTN();
         break;
     }
 
@@ -156,15 +159,16 @@ void perf() {
     double std = 0;
     TotalWTA /= numofProcesses;
     TotalWait /= numofProcesses;
+    TotalTime = TotalRun + idealtime;
     FILE *schedulerperf = fopen("scheduler.perf", "a");
-    fprintf(schedulerperf,"Running time %.2lf Total Time %.2lf \n",TotalRun,TotalTime);
+    fprintf(schedulerperf, "Running time %.2lf Total Time %.2lf \n", TotalRun, TotalTime);
     TotalRun /= TotalTime;
     TotalRun *= 100;
     fprintf(schedulerperf, "CPU Utilization = %.2lf%%\n", TotalRun);
     fprintf(schedulerperf, "Avg WTA = %.2lf\n", TotalWTA);
     fprintf(schedulerperf, "Avg Waiting = %.2lf\n", TotalWait);
     for (int i = 1; i <= numofProcesses; ++i) {
-        std += (WtaT[i] - TotalWTA)*(WtaT[i] - TotalWTA);
+        std += (WtaT[i] - TotalWTA) * (WtaT[i] - TotalWTA);
     }
     std = squareRoot(std);
     fprintf(schedulerperf, "Std WTA = %.2lf\n", std);
@@ -438,86 +442,88 @@ void HPF()
 void SRTN() {
     printf("executing SRTN algorithm\n");
 
-    struct priority_Queue readyQueue;
-
-
     recievedProcesses = (struct Process *) malloc(numofProcesses * sizeof(struct Process));
     struct Process *recv;
+    struct priority_Queue readyQueue;
 
     int currentTime;
+    int prevtime = 0;
+    bool firsttime = 1;
+    while (getClk() == 0);
 
-    while (true) {
-        // initialize the time
+    while (terminatedProcessesNum < numofProcesses) {
         currentTime = getClk();
-
+        usleep(100);
         // if all processes are terminated
-        if (terminatedProcessesNum == numofProcesses) {
-            break;
+        int val = msgrcv(msgqid, &recievedProcesses[recievedProcessesNum], sizeof(struct Process), 0, IPC_NOWAIT);
+        if (val != -1) {
+            recv = &recievedProcesses[recievedProcessesNum];
+            forkProcess(recv);
+            kill(recv->id, SIGCONT);
+            raise(SIGSTOP);
+            usleep(100); //wait 10microseconds
+            kill(recv->id, SIGCONT);
+            recv->starttime = -1;
+            priority_enqueue(&readyQueue, recv, 1);
+            TotalRun+=recv->runtime;
+            recievedProcessesNum++;
         }
-        TotalTime++;
-        // check if there is any recieved processes
-        while (currentTime == getClk())
-            if (recievedProcessesNum < numofProcesses) {
-                int val = msgrcv(msgqid, &recievedProcesses[recievedProcessesNum], sizeof(struct Process), 0,
-                                 IPC_NOWAIT);
-                while (val != -1) {
-                    recv = &recievedProcesses[recievedProcessesNum];
-                    forkProcess(recv);
-                    kill(recv->pid, SIGSTOP);
-                    recv->starttime = -1;
-                    priority_enqueue(&readyQueue, recv, 1);
-                    recievedProcessesNum++;
-                    val = msgrcv(msgqid, &recievedProcesses[recievedProcessesNum], sizeof(struct Process), 0,
-                                 IPC_NOWAIT);
+        // start of the program
+        if (currentTime != prevtime) {
+            if (RunningProcess && RunningProcess->remainingTime == 0) {
+                // notify process termination
+                RunningProcess->finishtime = currentTime;
+                Outp(3, currentTime, RunningProcess);
+                RunningProcess->state = terminated;
+                terminatedProcessesNum++;
+                RunningProcess = NULL;
+            }
+            if (RunningProcess == NULL) {
+                if (!priority_isempty(&readyQueue)) {
+                    RunningProcess = priority_dequeue(&readyQueue);
+                    RunningProcess->state = running;
+                    (*runPshmadd) = RunningProcess->remainingTime;
+                    contProcess(RunningProcess);
+                    if (RunningProcess->starttime == -1) {
+                        RunningProcess->starttime = currentTime;
+                        Outp(0, currentTime, RunningProcess);
+                    } else {
+                        Outp(1, currentTime, RunningProcess);
+                    }
+                }
+            } else if (!priority_isempty(&readyQueue)) {
+                min = priority_peek(&readyQueue);
+                if (min->remainingTime < RunningProcess->remainingTime) {
+                    Outp(2, currentTime, RunningProcess);
+                    RunningProcess->state = ready;
+                    priority_enqueue(&readyQueue, RunningProcess, 1);
+                    stopProcess(RunningProcess);
+                    RunningProcess = min;
+                    priority_dequeue(&readyQueue);
+                    RunningProcess->state = running;
+                    (*runPshmadd) = RunningProcess->remainingTime;
+                    contProcess(RunningProcess);
+                    if (RunningProcess->starttime == -1) {
+                        RunningProcess->starttime = currentTime;
+                        Outp(0, currentTime, RunningProcess);
+                    } else {
+                        Outp(1, currentTime, RunningProcess);
+                    }
                 }
             }
-        // check termination
-        if (RunningProcess && RunningProcess->remainingTime == 0) {
-            // notify process termination
-            RunningProcess->finishtime = currentTime;
-            Outp(3, currentTime, RunningProcess);
-            RunningProcess->state = terminated;
-            terminatedProcessesNum++;
-            RunningProcess = NULL;
-        }
-        if (RunningProcess == NULL) {
-            if (!priority_isempty(&readyQueue)) {
-                RunningProcess = priority_dequeue(&readyQueue);
-                RunningProcess->state = running;
-                (*runPshmadd) = RunningProcess->remainingTime;
-                contProcess(RunningProcess);
-                if (RunningProcess->starttime == -1) {
-                    RunningProcess->starttime = currentTime;
-                    Outp(0, currentTime, RunningProcess);
-                } else {
-                    Outp(1, currentTime, RunningProcess);
-                }
+            // get remaining time
+            if (RunningProcess != NULL && RunningProcess->remainingTime > 0) {
+                kill(RunningProcess->pid, SIGCONT);
+                raise(SIGSTOP);
+                usleep(100); //wait 10microseconds
+                kill(RunningProcess->id, SIGCONT);
+                RunningProcess->remainingTime--;
             }
-        } else if (!priority_isempty(&readyQueue)) {
-            min = priority_peek(&readyQueue);
-            if (min->remainingTime < RunningProcess->remainingTime) {
-                Outp(2, currentTime, RunningProcess);
-                RunningProcess->state = ready;
-                priority_enqueue(&readyQueue, RunningProcess, 1);
-                stopProcess(RunningProcess);
-                RunningProcess = min;
-                priority_dequeue(&readyQueue);
-                RunningProcess->state = running;
-                (*runPshmadd) = RunningProcess->remainingTime;
-                contProcess(RunningProcess);
-                if (RunningProcess->starttime == -1) {
-                    RunningProcess->starttime = currentTime;
-                    Outp(0, currentTime, RunningProcess);
-                } else {
-                    Outp(1, currentTime, RunningProcess);
-                }
+            else if (!RunningProcess && terminatedProcessesNum != numofProcesses){
+                idealtime++;
             }
+            prevtime = currentTime;
+            currentTime = getClk();
         }
-        // get remaining time
-        if (RunningProcess != NULL && RunningProcess->remainingTime > 0) {
-            RunningProcess->remainingTime = (*runPshmadd);
-            TotalRun++;
-        }
-        printf("%d\n", currentTime);
     }
 }
