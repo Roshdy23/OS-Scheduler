@@ -276,7 +276,7 @@ void RR(int quantum)
 
     int currentTime;
     int prevtime=0;
-    while (getClk() == 0);
+    // while (getClk() == 0);
     
     while (terminatedProcessesNum < numofProcesses)
     {
@@ -289,6 +289,7 @@ void RR(int quantum)
             recv = &recievedProcesses[recievedProcessesNum];
             forkProcess(recv);
             kill(recv->id,SIGCONT);
+            TotalRun+=recv->runtime;
             raise(SIGSTOP);
             usleep(100); //wait 10microseconds
             kill(recv->id,SIGCONT);
@@ -375,7 +376,6 @@ void RR(int quantum)
             }
         }
     }
-    idealtime--;
 }
 
 //---------------------HPF---------------------------------------------

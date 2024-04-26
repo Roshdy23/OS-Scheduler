@@ -1,5 +1,5 @@
-Running time 0.00 Total Time 0.00 
-CPU Utilization = -nan%
-Avg WTA = -nan
-Avg Waiting = -nan
-Std WTA = 0.00
+Running time 81.00 Total Time 82.00 
+CPU Utilization = 98.78%
+Avg WTA = 3.10
+Avg Waiting = 31.00
+Std WTA = 1.36

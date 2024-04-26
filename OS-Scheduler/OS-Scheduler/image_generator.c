@@ -19,14 +19,12 @@ int countLines(char *filePath)
     return lines;
 }
 //----------------generate image---------------//
-static void convertTxttoImage(char *filePath,char* imageName)
+static void convertTxttoImage(char *filePath, char *imageName)
 {
     int linesNum = countLines(filePath);
 
-    printf("number of lines %d\n", linesNum);
-
     // Create a Cairo surface
-    cairo_surface_t *surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 15 * 65, 25 * (linesNum)+80); // Adjust dimensions as needed
+    cairo_surface_t *surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 15 * 65, 25 * (linesNum) + 80); // Adjust dimensions as needed
 
     // Create a Cairo context
     cairo_t *cr = cairo_create(surface);
@@ -79,6 +77,6 @@ static void convertTxttoImage(char *filePath,char* imageName)
 int main(int argc, char **argv)
 {
     convertTxttoImage("scheduler.log", "scheduler.log.png");
-    convertTxttoImage("scheduler.perf","scheduler.perf.png");
-     return 0;
+    convertTxttoImage("scheduler.perf", "scheduler.perf.png");
+    return 0;
 }
