@@ -23,12 +23,12 @@ void clearResources(int signum)
     kill(getpid(), SIGKILL);
 }
 
-void readFile()
+void readFile(char* filePath)
 {
     FILE *file;
     char line[100];
 
-    file = fopen("processes.txt", "r");
+    file = fopen(filePath, "r");
     if (file == NULL)
     {
         printf("Error in opening the file .");
@@ -165,9 +165,12 @@ int main(int argc, char *argv[])
 {
     signal(SIGINT, clearResources);
     // TODO Initialization
-    readFile(); // 1. Read the input files. (done)
+    char* filePath = argv[1];
+    algorithm=atoi(argv[2]);
+    qtm=atoi(argv[3]);
+    readFile(filePath); // 1. Read the input files. (done)
 
-    choose_scheduling_algo();
+    //choose_scheduling_algo();
     create_clock_and_scheduler(); // 2. Ask the user for the chosen scheduling algorithm and its parameters, if there are any. (done)
     // create_scheduler();                                 // 3. Initiate and create the scheduler and clock processes.
     // 4. Use this function after creating the clock process to initialize clock
