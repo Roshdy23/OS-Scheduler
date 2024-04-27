@@ -429,10 +429,12 @@ void HPF()
                          // get remainig time & reduce the remaining quantum
             if (RunningProcess != NULL && RunningProcess->remainingTime > 0)
             {
-                kill(RunningProcess->pid,SIGCONT);
-                raise(SIGSTOP);
-                usleep(100); //wait 10microseconds
-                kill(RunningProcess->id,SIGCONT);
+                  up(semm2);
+                down(semm1);
+                // kill(RunningProcess->pid,SIGCONT);
+                // raise(SIGSTOP);
+                // usleep(100); //wait 10microseconds
+                // kill(RunningProcess->id,SIGCONT);
                 RunningProcess->remainingTime = (*runPshmadd);
                
             }
@@ -570,10 +572,12 @@ void SRTN() {
             }
             // get remaining time
             if (RunningProcess != NULL && RunningProcess->remainingTime > 0) {
-                kill(RunningProcess->pid, SIGCONT);
-                raise(SIGSTOP);
-                usleep(100); //wait 10microseconds
-                kill(RunningProcess->id, SIGCONT);
+                // kill(RunningProcess->pid, SIGCONT);
+                // raise(SIGSTOP);
+                // usleep(100); //wait 10microseconds
+                // kill(RunningProcess->id, SIGCONT);
+                up(semm2);
+                down(semm1);
                 RunningProcess->remainingTime--;
             }
             else if (!RunningProcess && terminatedProcessesNum != numofProcesses){
