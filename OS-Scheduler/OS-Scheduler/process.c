@@ -13,7 +13,9 @@ int main(int agrc, char *argv[])
         perror("Error in create sem");
         exit(-1);
     }
+
     initClk();
+
     key_t key = ftok("key", 'r'); // shared memory to get the remain time of the running process
     int runPshmid = shmget(key, 4, 0666 | IPC_CREAT);
 
@@ -22,26 +24,27 @@ int main(int agrc, char *argv[])
         perror("Error in creating message queue");
         exit(-1);
     }
+    int *runPshmadd = (int *)shmat(runPshmid, 0, 0); // remainingTime
+    
+    // to handle synchronization between scheduler
     usleep(100); //wait 100microseconds
     kill(getppid(),SIGCONT);
-        raise(SIGSTOP);
-        usleep(100); //wait 10microseconds
-        kill(getppid(),SIGCONT);
-    int *runPshmadd = (int *)shmat(runPshmid, 0, 0); // remainingTime
+    raise(SIGSTOP);
+    usleep(100); //wait 10microseconds
+    kill(getppid(),SIGCONT);
 
-    // TODO it needs to get the remaining time from somewhere
+    // run the process
     int currentTime = getClk();
     int remainingTime = (*runPshmadd);
     while (remainingTime > 0)
     {
-        //printf("process %d remainTime=%d ", getpid(), remainingTime);
         while (currentTime == getClk()) // wait till the next clk;
-            if (remainingTime == 0)
-                break;
-        down(sem2);
+        if (remainingTime == 0)
+            break;
+        down(sem2); // wait for scheduler
         (*runPshmadd)--;
         remainingTime = (*runPshmadd);
-        up(sem1);
+        up(sem1); // up the scheduler
         currentTime = getClk(); // update the time
     }
 

@@ -44,6 +44,7 @@ void clearsemaphores()
 //-------------------------------main function---------------------------//
 int main(int argc, char *argv[])
 {
+    //create semaphores to handle process and scheduler synchronization
     union Semun semun;
     semm1 = semget('5', 1, 0666 | IPC_CREAT);
     semm2 = semget('6', 1, 0666 | IPC_CREAT);
@@ -64,6 +65,7 @@ int main(int argc, char *argv[])
         perror("Error in semctl");
         exit(-1);
     }
+
     TotalTime = TotalWTA = TotalWait = TotalRun = 0;
     FILE *schedulerlog = fopen("scheduler.log", "w");
     FILE *schedulerperf = fopen("scheduler.perf", "w");
@@ -71,7 +73,6 @@ int main(int argc, char *argv[])
     fclose(schedulerlog);
 
     initClk();
-    printf("hi from scheduler\n");
 
     initializeQueue(&readyQueue);
 
@@ -110,7 +111,7 @@ int main(int argc, char *argv[])
     // upon termination release the clock resources.
     perf();
     destroyClk(false);
-    clearsemaphores();
+    clearsemaphores(); 
     if(shmctl(runPshmid,IPC_RMID,NULL)==-1){
         perror("error while clearing the shared memory");
     }
@@ -228,7 +229,6 @@ double squareRoot(double n) {
 //------------------------ RR algorithm -----------------------------------//
 void RR(int quantum)
 {
-    printf("executing RR algorithm\n");
     int remainQuantum = quantum;
 
     recievedProcesses = (struct Process *)malloc(numofProcesses * sizeof(struct Process));
@@ -240,20 +240,26 @@ void RR(int quantum)
     while (terminatedProcessesNum < numofProcesses)
     {
         currentTime = getClk();
-        usleep(100);
+        usleep(100); // just to be sure the process generator arrives and send the process info 
+
+        // recieve process and put it in recievedProcesses array
         int val = msgrcv(msgqid, &recievedProcesses[recievedProcessesNum], sizeof(struct Process), 0, IPC_NOWAIT);
         if (val != -1)
         {
             recv = &recievedProcesses[recievedProcessesNum];
             forkProcess(recv);
+
+            //to handler synchronization between process
             kill(recv->id,SIGCONT);
             TotalRun+=recv->runtime;
             raise(SIGSTOP);
             usleep(100); //wait 10microseconds
             kill(recv->id,SIGCONT);
+
             enqueue(&readyQueue, recv);
             recievedProcessesNum++;
         }
+
         // start of the program
         if(currentTime!=prevtime)
         {
@@ -325,7 +331,6 @@ void RR(int quantum)
             }
         }
     }
-    printf("ideal time =%lf\n",idealtime);
     free(recievedProcesses);
 }
 
