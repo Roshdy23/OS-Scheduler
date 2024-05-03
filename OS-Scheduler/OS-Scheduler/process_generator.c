@@ -212,5 +212,6 @@ int main(int argc, char *argv[])
     int status;
     waitpid(scheduler_id, &status, 0);
     printf("Child process finished with status %d\n", status);
+    clearResources(0);
     destroyClk(true);
 }
