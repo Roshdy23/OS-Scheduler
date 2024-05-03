@@ -17,6 +17,7 @@ void clearResources(int signum)
     // TODO Clears all resources in case of interruption
 
     msgctl(msgqid, IPC_RMID, NULL);
+    free(processes);
 
     kill(scheduler_id, SIGKILL);
     kill(clk_id, SIGKILL);
@@ -211,5 +212,6 @@ int main(int argc, char *argv[])
     int status;
     waitpid(scheduler_id, &status, 0);
     printf("Child process finished with status %d\n", status);
+    clearResources(0);
     destroyClk(true);
 }
