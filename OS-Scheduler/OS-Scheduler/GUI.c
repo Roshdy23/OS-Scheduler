@@ -66,7 +66,6 @@ static void simulateClickHandler(GtkWidget *widget, gpointer data)
     char algstr[10];
     sprintf(algstr, "%d", (active_index + 1));
     execl("./process_generator.out", "process_generator.out", filePathText, algstr, quantum, NULL);
-    g_print("end of programm was here\n");
     return;
 }
 

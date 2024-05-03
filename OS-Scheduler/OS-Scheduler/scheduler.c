@@ -5,7 +5,7 @@ void HPF();
 void SRTN();
 void perf();
 int quantum;
-struct CircularQueue readyQueue; // queue to store arrived processes
+struct Queue readyQueue; // queue to store arrived processes
 double squareRoot(double n);
 double TotalWTA, TotalWait, TotalRun, TotalTime;
 double WtaT[500];
@@ -27,44 +27,7 @@ int *runPshmadd;
 double idealtime = 0;
 int semm1;
 int semm2;
-FILE*pf;
-union Semun
-{
-    int val;               /* Value for SETVAL */
-    struct semid_ds *buf;  /* Buffer for IPC_STAT, IPC_SET */
-    unsigned short *array; /* Array for GETALL, SETALL */
-    struct seminfo *__buf; /* Buffer for IPC_INFO (Linux-specific) */
-};
 
-void down(int sem)
-{
-    struct sembuf op;
-
-    op.sem_num = 0;
-    op.sem_op = -1;
-    op.sem_flg = !IPC_NOWAIT;
-
-    if (semop(sem, &op, 1) == -1)
-    {
-        perror("Error in down()");
-        exit(-1);
-    }
-}
-
-void up(int sem)
-{
-    struct sembuf op;
-
-    op.sem_num = 0;
-    op.sem_op = 1;
-    op.sem_flg = !IPC_NOWAIT;
-
-    if (semop(sem, &op, 1) == -1)
-    {
-        perror("Error in up()");
-        exit(-1);
-    }
-}
 void clearsemaphores()
 {
     if(semctl(semm1, 0, IPC_RMID) == -1) {
@@ -81,11 +44,9 @@ void clearsemaphores()
 //-------------------------------main function---------------------------//
 int main(int argc, char *argv[])
 {
-        union Semun semun;
-
-     semm1 = semget('5', 1, 0666 | IPC_CREAT);
-     semm2 = semget('6', 1, 0666 | IPC_CREAT);
-    // printf("%d\n",semm2);
+    union Semun semun;
+    semm1 = semget('5', 1, 0666 | IPC_CREAT);
+    semm2 = semget('6', 1, 0666 | IPC_CREAT);
     if (semm1 == -1 || semm2 == -1)
     {
         perror("Error in create sem");
@@ -108,13 +69,12 @@ int main(int argc, char *argv[])
     FILE *schedulerperf = fopen("scheduler.perf", "w");
     fclose(schedulerperf);
     fclose(schedulerlog);
-    pf=fopen("scheduler.log","w");
-    if(pf==NULL)
-         {printf("error in opening file");}
+
     initClk();
     printf("hi from scheduler\n");
 
-    initializeCircularQueue(&readyQueue);
+    initializeQueue(&readyQueue);
+
     key_t key = ftok("key", 'p');
     msgqid = msgget(key, 0666 | IPC_CREAT); // this message queue will comunicate process generator with scheduler
 
@@ -148,8 +108,12 @@ int main(int argc, char *argv[])
     }
 
     // upon termination release the clock resources.
-    // destroyClk(true);
     perf();
+    destroyClk(false);
+    clearsemaphores();
+    if(shmctl(runPshmid,IPC_RMID,NULL)==-1){
+        perror("error while clearing the shared memory");
+    }
     execl("./image_generator.out","image_generator.out",NULL);
 }
 
@@ -168,7 +132,6 @@ int forkProcess(struct Process *p)
     }
     else
     {
-        // printf("the scheduler forked a process with id=%d at %d\n", p->id, getClk());
         return p->pid;
     }
 }
@@ -176,7 +139,6 @@ int forkProcess(struct Process *p)
 void stopProcess(struct Process *p)
 {
     p->lastStopTime = getClk();
-    // printf("the scheduler stoped process with id=%d\n", p->id);
     kill(p->pid, SIGSTOP);
     p->remainingTime = (*runPshmadd);
 }
@@ -184,7 +146,6 @@ void stopProcess(struct Process *p)
 void contProcess(struct Process *p)
 {
     p->waitingTime += getClk() - p->lastStopTime;
-    // printf("the scheduler sent continue signal to process with id=%d\n", p->id);
     (*runPshmadd) = p->remainingTime;
     kill(p->pid, SIGCONT);
 }
@@ -268,7 +229,6 @@ double squareRoot(double n) {
 void RR(int quantum)
 {
     printf("executing RR algorithm\n");
-    // printf("%d\n",semm2);
     int remainQuantum = quantum;
 
     recievedProcesses = (struct Process *)malloc(numofProcesses * sizeof(struct Process));
@@ -276,13 +236,11 @@ void RR(int quantum)
 
     int currentTime;
     int prevtime=0;
-    // while (getClk() == 0);
     
     while (terminatedProcessesNum < numofProcesses)
     {
         currentTime = getClk();
         usleep(100);
-        // if all processes are terminated
         int val = msgrcv(msgqid, &recievedProcesses[recievedProcessesNum], sizeof(struct Process), 0, IPC_NOWAIT);
         if (val != -1)
         {
@@ -293,27 +251,21 @@ void RR(int quantum)
             raise(SIGSTOP);
             usleep(100); //wait 10microseconds
             kill(recv->id,SIGCONT);
-            enqueueInCQ(&readyQueue, recv);
+            enqueue(&readyQueue, recv);
             recievedProcessesNum++;
         }
-          // start of the program
+        // start of the program
         if(currentTime!=prevtime)
         {
             if (!RunningProcess)
                 idealtime++;
             prevtime = currentTime;
             currentTime = getClk();
-                         // get remainig time & reduce the remaining quantum
+            // get remainig time & reduce the remaining quantum
             if (RunningProcess != NULL && RunningProcess->remainingTime > 0 && remainQuantum > 0)
             {
-                printf("scheduler:%d\n",currentTime);
-                // printf("%d\n",semm2);
                 up(semm2);
                 down(semm1);
-                // kill(RunningProcess->pid,SIGCONT);
-                // raise(SIGSTOP);
-                // usleep(100); //wait 10microseconds
-                // kill(RunningProcess->id,SIGCONT);
                 RunningProcess->remainingTime = (*runPshmadd);
                 remainQuantum -= 1;
             }
@@ -323,7 +275,7 @@ void RR(int quantum)
                 if (!isEmpty(readyQueue))
                 {
                     remainQuantum = quantum;
-                    RunningProcess = dequeueOFCQ(&readyQueue);
+                    RunningProcess = dequeue(&readyQueue);
                     contProcess(RunningProcess);
                     RunningProcess->state = running;
                     if (RunningProcess->starttime == -1)
@@ -341,30 +293,27 @@ void RR(int quantum)
                 // noyify process termination
                 if (RunningProcess->remainingTime == 0)
                 {
-                    // printf("process with id=%d terminated with %d\n", RunningProcess->id, RunningProcess->remainingTime);
+                    waitpid(RunningProcess->pid,NULL,0);
                     RunningProcess->state = terminated;
                     terminatedProcessesNum++;
                     RunningProcess->finishtime = currentTime;
                     Outp(3, currentTime, RunningProcess);
                     RunningProcess = NULL;
-                    // printf("the process terminated\n");
-                // 
                 }
                 // switch processes
                 else
                 {
-                    RunningProcess->state = ready; // change state to ready
-                    enqueueInCQ(&readyQueue, RunningProcess);
-                    stopProcess(RunningProcess); // send stop signal to this process
+                    RunningProcess->state = ready;
+                    enqueue(&readyQueue, RunningProcess);
+                    stopProcess(RunningProcess);
                     Outp(2, currentTime, RunningProcess);
                     RunningProcess = NULL;
-                    // printf("stopped\n");
                 }
                 if (!isEmpty(readyQueue))
                 {
                     printf("Context switching\n");
                     remainQuantum = quantum;
-                    RunningProcess = dequeueOFCQ(&readyQueue);
+                    RunningProcess = dequeue(&readyQueue);
                     RunningProcess->state = running;
                     (*runPshmadd) = RunningProcess->remainingTime;
                     contProcess(RunningProcess);
@@ -376,6 +325,8 @@ void RR(int quantum)
             }
         }
     }
+    printf("ideal time =%lf\n",idealtime);
+    free(recievedProcesses);
 }
 
 //---------------------HPF---------------------------------------------
@@ -392,7 +343,7 @@ void HPF()
     int currentTime;
     int prevtime=1;
     bool firsttime=1;
-    while (getClk() == 0);
+    // while (getClk() == 0);
     
     while (terminatedProcessesNum < numofProcesses)
     {

@@ -28,13 +28,14 @@ int getClk()
     return *shmaddr;
 }
 
+int shmid;
 /*
  * All process call this function at the beginning to establish communication between them and the clock module.
  * Again, remember that the clock is only emulation!
  */
 void initClk()
 {
-    int shmid = shmget(SHKEY, 4, 0444);
+    shmid = shmget(SHKEY, 4, 0444);
     while ((int)shmid == -1)
     {
         // Make sure that the clock exists
@@ -58,6 +59,7 @@ void destroyClk(bool terminateAll)
     shmdt(shmaddr);
     if (terminateAll)
     {
+        shmctl(shmid, IPC_RMID, NULL);
         killpg(getpgrp(), SIGINT);
     }
 }
@@ -91,44 +93,80 @@ struct ProcessNode
     struct ProcessNode *next;
 };
 
+union Semun
+{
+    int val;               /* Value for SETVAL */
+    struct semid_ds *buf;  /* Buffer for IPC_STAT, IPC_SET */
+    unsigned short *array; /* Array for GETALL, SETALL */
+    struct seminfo *__buf; /* Buffer for IPC_INFO (Linux-specific) */
+};
+
+void down(int sem)
+{
+    struct sembuf op;
+
+    op.sem_num = 0;
+    op.sem_op = -1;
+    op.sem_flg = !IPC_NOWAIT;
+
+    if (semop(sem, &op, 1) == -1)
+    {
+        perror("Error in down()");
+        exit(-1);
+    }
+}
+
+void up(int sem)
+{
+    struct sembuf op;
+
+    op.sem_num = 0;
+    op.sem_op = 1;
+    op.sem_flg = !IPC_NOWAIT;
+
+    if (semop(sem, &op, 1) == -1)
+    {
+        perror("Error in up()");
+        exit(-1);
+    }
+}
+
 //-------------------------- RR headers ------------------------//
 
-struct CircularQueue
+struct Queue
 {
     struct ProcessNode *front;
     struct ProcessNode *rear;
 };
 
-void initializeCircularQueue(struct CircularQueue *q)
+void initializeQueue(struct Queue *q)
 {
     q->front = NULL;
     q->rear = NULL;
 }
 
-void enqueueInCQ(struct CircularQueue *q, struct Process *p)
+void enqueue(struct Queue *q, struct Process *p)
 {
     struct ProcessNode *newProcess;
     newProcess = (struct ProcessNode *)malloc(sizeof(struct ProcessNode));
     newProcess->process = p;
     newProcess->next = NULL;
 
-    if (q->front == NULL && q->rear == NULL)
-    { // if empty queue
+    if (q->front == NULL)
+    {
+        // if empty queue
         q->front = newProcess;
-        (q->front)->next = q->front;
-        q->rear = q->front;
-        // printf("process enqueued");
+        q->rear = newProcess;
     }
     else
     {
-        q->rear->next = newProcess;
+        (q->rear)->next = newProcess;
         q->rear = newProcess;
-        (q->rear)->next = q->front;
-        // printf("process enqueued");
+        (q->rear)->next = NULL;
     }
 }
 
-struct Process *dequeueOFCQ(struct CircularQueue *q)
+struct Process *dequeue(struct Queue *q)
 {
     if (q->front != NULL)
     {
@@ -142,18 +180,16 @@ struct Process *dequeueOFCQ(struct CircularQueue *q)
         }
         else
         {
-            (q->rear)->next = (q->front)->next;
             q->front = (q->front)->next;
             n->next = NULL;
         }
-        //free(n);
         return p;
     }
     else
         return NULL;
 }
 
-void displayCQ(struct CircularQueue q)
+void displayQ(struct Queue q)
 {
     struct ProcessNode *it = q.front;
     if (!q.front)
@@ -168,7 +204,7 @@ void displayCQ(struct CircularQueue q)
     return;
 }
 
-bool isEmpty(struct CircularQueue q)
+bool isEmpty(struct Queue q)
 {
     if (q.front == NULL)
         return true;
@@ -176,90 +212,95 @@ bool isEmpty(struct CircularQueue q)
         return false;
 }
 
-//------------------------------------------------------------
-
 // -----------------------------------------Priority Queue Data Structure ------------------------------
 
-struct priority_Queue {
-struct ProcessNode* front;
+struct priority_Queue
+{
+    struct ProcessNode *front;
 };
 
 void initializePriorityQueue(struct priority_Queue *q)
 {
     q->front = NULL;
-    
 }
-// enqueue dequeue peek isempty display 
+// enqueue dequeue peek isempty display
 
-void priority_enqueue(struct priority_Queue *q, struct Process *p,int op)
+void priority_enqueue(struct priority_Queue *q, struct Process *p, int op)
 {
-   struct ProcessNode *newProcess;
+    struct ProcessNode *newProcess;
     newProcess = (struct ProcessNode *)malloc(sizeof(struct ProcessNode));
     newProcess->process = p;
     newProcess->next = NULL;
-    if(op == 0) {
-        if (q->front == NULL || q->front->process->priority > newProcess->process->priority) {
-            newProcess->next = q->front;
-            q->front = newProcess;
-        } else {
-            struct ProcessNode *temp = q->front;
-            while (temp->next && temp->next->process->priority <= p->priority)temp = temp->next;
-            newProcess->next = temp->next;
-            temp->next = newProcess;
-        }
-    }
-    if(op == 1) {
-        if (q->front == NULL || q->front->process->remainingTime > newProcess->process->remainingTime) {
-            newProcess->next = q->front;
-            q->front = newProcess;
-        } else {
-            struct ProcessNode *temp = q->front;
-            while (temp->next && temp->next->process->remainingTime <= p->remainingTime)temp = temp->next;
-            newProcess->next = temp->next;
-            temp->next = newProcess;
-        }
-    }
-}
-
-struct Process* priority_peek(struct priority_Queue *q)
-{
-    if(q->front)return q->front->process;
-    else return NULL;
-}
-
-struct Process* priority_dequeue(struct priority_Queue *q)
-{
-    if(q->front)
+    if (op == 0)
     {
-        struct  Process* temp= q->front->process;
-        struct ProcessNode* temp2=q->front;
-        q->front=q->front->next;
-       temp2->next=NULL;
-    
+        if (q->front == NULL || q->front->process->priority > newProcess->process->priority)
+        {
+            newProcess->next = q->front;
+            q->front = newProcess;
+        }
+        else
+        {
+            struct ProcessNode *temp = q->front;
+            while (temp->next && temp->next->process->priority <= p->priority)
+                temp = temp->next;
+            newProcess->next = temp->next;
+            temp->next = newProcess;
+        }
+    }
+    if (op == 1)
+    {
+        if (q->front == NULL || q->front->process->remainingTime > newProcess->process->remainingTime)
+        {
+            newProcess->next = q->front;
+            q->front = newProcess;
+        }
+        else
+        {
+            struct ProcessNode *temp = q->front;
+            while (temp->next && temp->next->process->remainingTime <= p->remainingTime)
+                temp = temp->next;
+            newProcess->next = temp->next;
+            temp->next = newProcess;
+        }
+    }
+}
+
+struct Process *priority_peek(struct priority_Queue *q)
+{
+    if (q->front)
+        return q->front->process;
+    else
+        return NULL;
+}
+
+struct Process *priority_dequeue(struct priority_Queue *q)
+{
+    if (q->front)
+    {
+        struct Process *temp = q->front->process;
+        struct ProcessNode *temp2 = q->front;
+        q->front = q->front->next;
+        temp2->next = NULL;
+
         return temp;
     }
     return NULL;
-
 }
-
 
 bool priority_isempty(struct priority_Queue *q)
 {
-    return (q->front==NULL);
+    return (q->front == NULL);
 }
 
 void priority_display(struct priority_Queue *q)
 {
-    struct ProcessNode* it=q->front;
+    struct ProcessNode *it = q->front;
 
-  
-
-    while(it)
+    while (it)
     {
-        printf("process id = %d , arrival time = %d , priority = %d \n",it->process->priority, it->process->id,it->process->arrival_time);
-        it=it->next;
-        
-    } 
+        printf("process id = %d , arrival time = %d , priority = %d \n", it->process->priority, it->process->id, it->process->arrival_time);
+        it = it->next;
+    }
 }
 
 //------------------------------------------------------------------------
