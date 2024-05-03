@@ -17,6 +17,7 @@ void clearResources(int signum)
     // TODO Clears all resources in case of interruption
 
     msgctl(msgqid, IPC_RMID, NULL);
+    free(processes);
 
     kill(scheduler_id, SIGKILL);
     kill(clk_id, SIGKILL);
