@@ -240,7 +240,7 @@ void RR(int quantum)
     while (terminatedProcessesNum < numofProcesses)
     {
         currentTime = getClk();
-        usleep(100); // just to be sure the process generator arrives and send the process info 
+        usleep(200); // just to be sure the process generator arrives and send the process info 
 
         // recieve process and put it in recievedProcesses array
         int val = msgrcv(msgqid, &recievedProcesses[recievedProcessesNum], sizeof(struct Process), 0, IPC_NOWAIT);
@@ -353,7 +353,7 @@ void HPF()
     while (terminatedProcessesNum < numofProcesses)
     {
         currentTime = getClk();
-        usleep(100);
+        usleep(200);
         // if all processes are terminated
         int val = msgrcv(msgqid, &recievedProcesses[recievedProcessesNum], sizeof(struct Process), 0, IPC_NOWAIT);
         if (val != -1)
@@ -468,7 +468,7 @@ void SRTN() {
 
     while (terminatedProcessesNum < numofProcesses) {
         currentTime = getClk();
-        usleep(100);
+        usleep(200);
         // if all processes are terminated
         int val = msgrcv(msgqid, &recievedProcesses[recievedProcessesNum], sizeof(struct Process), 0, IPC_NOWAIT);
         if (val != -1) {
