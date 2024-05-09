@@ -144,9 +144,13 @@ int main(int argc, char *argv[])
 
     FILE *schedulerperf = fopen("scheduler.perf", "w");
 
+    FILE *memorylog= fopen("memory.log", "w");
+
     fclose(schedulerperf);
 
     fclose(schedulerlog);
+
+    fclose(memorylog);
 
 
 
@@ -504,7 +508,11 @@ void RR(int quantum)
 
             recievedProcessesNum++;
 
-            // allocatememory(recv,getClk());
+          int result=allocatememory(recv,getClk());
+
+          if(result==1)
+
+          {
 
             printmemory(getClk(),recv->size,recv->id,recv->start,recv->start+recv->size,1);
 
@@ -527,6 +535,18 @@ void RR(int quantum)
 
 
             enqueue(&readyQueue, recv);
+
+          }
+
+          else{
+
+            printf("no space in memory\n");
+
+            putinlist(recv);
+
+          }
+
+            
 
         }
 
@@ -614,9 +634,61 @@ void RR(int quantum)
 
                     RunningProcess->state = terminated;
 
-                    // freememory(RunningProcess->start,RunningProcess->size);
+                    freememory(RunningProcess->start,RunningProcess->size);
 
                     printmemory(getClk(),RunningProcess->size,RunningProcess->id,RunningProcess->start,RunningProcess->start+RunningProcess->size,2);
+
+                    struct Process*p=getfromlist();
+
+                    while (p!=NULL)
+
+                    {
+
+                        int result=allocatememory(p,getClk());
+
+                        if(result==1)
+
+                        {
+
+                            printmemory(getClk(),recv->size,recv->id,recv->start,recv->start+recv->size,1);
+
+                            forkProcess(recv);
+
+
+
+                            //to handler synchronization between process
+
+                            kill(recv->id,SIGCONT);
+
+                            TotalRun+=recv->runtime;
+
+                            raise(SIGSTOP);
+
+                            usleep(100); //wait 10microseconds
+
+                            kill(recv->id,SIGCONT);
+
+
+
+                            enqueue(&readyQueue, recv);
+
+                        }
+
+                        else{
+
+                            printf("no space in memory\n");
+
+                            break;
+
+                        }
+
+                        p=getfromlist();
+
+                    }
+
+                    
+
+                   
 
                     terminatedProcessesNum++;
 
@@ -732,9 +804,23 @@ void HPF()
 
         {
 
-            recv = &recievedProcesses[recievedProcessesNum];
+             recv = &recievedProcesses[recievedProcessesNum];
+
+            recievedProcessesNum++;
+
+          int result=allocatememory(recv,getClk());
+
+          if(result==1)
+
+          {
+
+            printmemory(getClk(),recv->size,recv->id,recv->start,recv->start+recv->size,1);
 
             forkProcess(recv);
+
+
+
+            //to handler synchronization between process
 
             kill(recv->id,SIGCONT);
 
@@ -748,7 +834,15 @@ void HPF()
 
             priority_enqueue(&readyQueue2,recv,0);
 
-            recievedProcessesNum++;
+          }
+
+          else{
+
+            printf("no space in memory\n");
+
+            putinlist(recv);
+
+          }
 
         }
 
@@ -846,6 +940,58 @@ void HPF()
 
             {
 
+                freememory(RunningProcess->start,RunningProcess->size);
+
+                    printmemory(getClk(),RunningProcess->size,RunningProcess->id,RunningProcess->start,RunningProcess->start+RunningProcess->size,2);
+
+                    struct Process*p=getfromlist();
+
+                    while (p!=NULL)
+
+                    {
+
+                        int result=allocatememory(p,getClk());
+
+                        if(result==1)
+
+                        {
+
+                            printmemory(getClk(),recv->size,recv->id,recv->start,recv->start+recv->size,1);
+
+                            forkProcess(recv);
+
+
+
+                            //to handler synchronization between process
+
+                            kill(recv->id,SIGCONT);
+
+                            TotalRun+=recv->runtime;
+
+                            raise(SIGSTOP);
+
+                            usleep(100); //wait 10microseconds
+
+                            kill(recv->id,SIGCONT);
+
+
+
+                            enqueue(&readyQueue, recv);
+
+                        }
+
+                        else{
+
+                            printf("no space in memory\n");
+
+                            break;
+
+                        }
+
+                        p=getfromlist();
+
+                    }
+
                 // noyify process termination
 
 
@@ -929,93 +1075,249 @@ void HPF()
 //------------------SRTN Algorithm----------------//
 
 void SRTN() {
+
     printf("executing SRTN algorithm\n");
 
+
+
     recievedProcesses = (struct Process *) malloc(numofProcesses * sizeof(struct Process));
+
     struct Process *recv;
+
     struct priority_Queue readyQueue;
 
+
+
     int currentTime;
+
     int prevtime = 0;
+
     bool firsttime = 1;
+
     while (getClk() == 0);
 
+
+
     while (terminatedProcessesNum < numofProcesses) {
+
         currentTime = getClk();
-        usleep(200);
+
+        usleep(100);
+
         // if all processes are terminated
+
         int val = msgrcv(msgqid, &recievedProcesses[recievedProcessesNum], sizeof(struct Process), 0, IPC_NOWAIT);
+
         if (val != -1) {
-            recv = &recievedProcesses[recievedProcessesNum];
-            forkProcess(recv);
-            kill(recv->id, SIGCONT);
-            TotalRun+=recv->runtime;
-            raise(SIGSTOP);
-            usleep(100); //wait 10microseconds
-            kill(recv->id, SIGCONT);
-            recv->starttime = -1;
-            priority_enqueue(&readyQueue, recv, 1);
+
+             recv = &recievedProcesses[recievedProcessesNum];
+
             recievedProcessesNum++;
-        }
-        // start of the program
-        if (currentTime != prevtime) {
-            // get remaining time
-            if (RunningProcess != NULL && RunningProcess->remainingTime > 0) {
-                // kill(RunningProcess->pid, SIGCONT);
-                // raise(SIGSTOP);
-                // usleep(100); //wait 10microseconds
-                // kill(RunningProcess->id, SIGCONT);
-                up(semm2);
-                down(semm1);
-                RunningProcess->remainingTime--;
-            }
-            else if (!RunningProcess && terminatedProcessesNum != numofProcesses){
-                idealtime++;
-            }
-            prevtime = currentTime;
-            currentTime = getClk();
-            if (RunningProcess && RunningProcess->remainingTime == 0) {
-                // notify process termination
-                RunningProcess->finishtime = currentTime;
-                Outp(3, currentTime, RunningProcess);
-                RunningProcess->state = terminated;
-                terminatedProcessesNum++;
-                RunningProcess = NULL;
-            }
-            if (RunningProcess == NULL) {
-                if (!priority_isempty(&readyQueue)) {
-                    RunningProcess = priority_dequeue(&readyQueue);
-                    RunningProcess->state = running;
-                    (*runPshmadd) = RunningProcess->remainingTime;
-                    contProcess(RunningProcess);
-                    if (RunningProcess->starttime == -1) {
-                        RunningProcess->starttime = currentTime;
-                        Outp(0, currentTime, RunningProcess);
-                    } else {
-                        Outp(1, currentTime, RunningProcess);
-                    }
-                }
-            } else if (!priority_isempty(&readyQueue)) {
-                min = priority_peek(&readyQueue);
-                if (min->remainingTime < RunningProcess->remainingTime) {
-                    Outp(2, currentTime, RunningProcess);
-                    RunningProcess->state = ready;
-                    priority_enqueue(&readyQueue, RunningProcess, 1);
-                    stopProcess(RunningProcess);
-                    RunningProcess = min;
-                    priority_dequeue(&readyQueue);
-                    RunningProcess->state = running;
-                    (*runPshmadd) = RunningProcess->remainingTime;
-                    contProcess(RunningProcess);
-                    if (RunningProcess->starttime == -1) {
-                        RunningProcess->starttime = currentTime;
-                        Outp(0, currentTime, RunningProcess);
-                    } else {
-                        Outp(1, currentTime, RunningProcess);
-                    }
-                }
-            }
+
+            recv->starttime = -1;
+
+          int result=allocatememory(recv,getClk());
+
+          if(result==1)
+
+          {
+
+            printmemory(getClk(),recv->size,recv->id,recv->start,recv->start+recv->size,1);
+
+            forkProcess(recv);
+
+
+
+            //to handler synchronization between process
+
+            kill(recv->id,SIGCONT);
+
+            TotalRun+=recv->runtime;
+
+            raise(SIGSTOP);
+
+            usleep(100); //wait 10microseconds
+
+            kill(recv->id,SIGCONT);
+
+            priority_enqueue(&readyQueue, recv, 1);
+
+          }
+
+          else{
+
+            printf("no space in memory\n");
+
+            putinlist(recv);
+
+          }
+
             
+
         }
-    }
+
+        // start of the program
+
+        if (currentTime != prevtime) {
+
+            if (RunningProcess && RunningProcess->remainingTime == 0) {
+
+                freememory(RunningProcess->start,RunningProcess->size);
+
+                    printmemory(getClk(),RunningProcess->size,RunningProcess->id,RunningProcess->start,RunningProcess->start+RunningProcess->size,2);
+
+                    struct Process*p=getfromlist();
+
+                    while (p!=NULL)
+
+                    {
+
+                        int result=allocatememory(p,getClk());
+
+                        if(result==1)
+
+                        {
+
+                            printmemory(getClk(),recv->size,recv->id,recv->start,recv->start+recv->size,1);
+
+                            forkProcess(recv);
+
+
+
+                            //to handler synchronization between process
+
+                            kill(recv->id,SIGCONT);
+
+                            TotalRun+=recv->runtime;
+
+                            raise(SIGSTOP);
+
+                            usleep(100); //wait 10microseconds
+
+                            kill(recv->id,SIGCONT);
+
+
+
+                            enqueue(&readyQueue, recv);
+
+                        }
+
+                        else{
+
+                            printf("no space in memory\n");
+
+                            break;
+
+                        }
+
+                        p=getfromlist();
+
+                    }
+
+                // notify process termination
+
+                RunningProcess->finishtime = currentTime;
+
+                Outp(3, currentTime, RunningProcess);
+
+                RunningProcess->state = terminated;
+
+                terminatedProcessesNum++;
+
+                RunningProcess = NULL;
+
+            }
+
+            if (RunningProcess == NULL) {
+
+                if (!priority_isempty(&readyQueue)) {
+
+                    RunningProcess = priority_dequeue(&readyQueue);
+
+                    RunningProcess->state = running;
+
+                    (*runPshmadd) = RunningProcess->remainingTime;
+
+                    contProcess(RunningProcess);
+
+                    if (RunningProcess->starttime == -1) {
+
+                        RunningProcess->starttime = currentTime;
+
+                        Outp(0, currentTime, RunningProcess);
+
+                    } else {
+
+                        Outp(1, currentTime, RunningProcess);
+
+                    }
+
+                }
+
+            } else if (!priority_isempty(&readyQueue)) {
+
+                min = priority_peek(&readyQueue);
+
+                if (min->remainingTime < RunningProcess->remainingTime) {
+
+                    Outp(2, currentTime, RunningProcess);
+
+                    RunningProcess->state = ready;
+
+                    priority_enqueue(&readyQueue, RunningProcess, 1);
+
+                    stopProcess(RunningProcess);
+
+                    RunningProcess = min;
+
+                    priority_dequeue(&readyQueue);
+
+                    RunningProcess->state = running;
+
+                    (*runPshmadd) = RunningProcess->remainingTime;
+
+                    contProcess(RunningProcess);
+
+                    if (RunningProcess->starttime == -1) {
+
+                        RunningProcess->starttime = currentTime;
+
+                        Outp(0, currentTime, RunningProcess);
+
+                    } else {
+
+                        Outp(1, currentTime, RunningProcess);
+
+                    }
+
+                }
+
+            }
+
+            // get remaining time
+
+            if (RunningProcess != NULL && RunningProcess->remainingTime > 0) {
+
+                up(semm2);
+
+                down(semm1);
+
+                RunningProcess->remainingTime--;
+
+            }
+
+            else if (!RunningProcess && terminatedProcessesNum != numofProcesses){
+
+                idealtime++;
+
+            }
+
+            prevtime = currentTime;
+
+            currentTime = getClk();
+
+ }
+
+}
+
 }
