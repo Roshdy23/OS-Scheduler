@@ -4,8 +4,6 @@
 
 struct Process *processes = NULL;
 
-
-
 int msgqid;
 
 
