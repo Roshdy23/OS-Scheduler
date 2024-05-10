@@ -27,25 +27,13 @@ int *sigshmaddr;
 
 
 void clearResources(int signum)
-
 {
-
     // TODO Clears all resources in case of interruption
-
-
-
     msgctl(msgqid, IPC_RMID, NULL);
-
     free(processes);
-
-
-
     kill(scheduler_id, SIGKILL);
-
     kill(clk_id, SIGKILL);
-
     kill(getpid(), SIGKILL);
-
 }
 
 
@@ -65,11 +53,8 @@ void readFile(char* filePath)
     if (file == NULL)
 
     {
-
         printf("Error in opening the file .");
-
         return;
-
     }
 
 
@@ -119,39 +104,14 @@ void readFile(char* filePath)
             continue; // Skip comment lines
 
         }
-
-
-
         int id, arrival, runtime, priority,memorysize;
-
         sscanf(line, "%d %d %d %d %d", &id, &arrival, &runtime, &priority,&memorysize);
-
-        
-
         (processes + i)->id = id;
-
-
-
         (processes + i)->arrival_time = arrival;
-
-
-
         (processes + i)->runtime = runtime;
-
-
-
         (processes + i)->remainingTime = runtime;
-
-
-
         (processes + i)->priority = priority;
-
-
-
         (processes + i)->size = memorysize;
-
-
-
         i++;
 
     }

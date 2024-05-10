@@ -78,5 +78,6 @@ int main(int argc, char **argv)
 {
     convertTxttoImage("scheduler.log", "scheduler.log.png");
     convertTxttoImage("scheduler.perf", "scheduler.perf.png");
+    convertTxttoImage("memory.log", "memory.log.png");
     return 0;
 }

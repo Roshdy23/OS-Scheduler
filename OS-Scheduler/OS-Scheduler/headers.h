@@ -24,19 +24,13 @@
 
 #include <math.h>
 
-
-
 typedef short bool;
 
 #define true 1
 
 #define false 0
 
-
-
 #define SHKEY 300
-
-
 
 ///==============================
 
@@ -46,17 +40,12 @@ int *shmaddr; //
 
 //===============================
 
-
-
 int getClk()
 
 {
 
     return *shmaddr;
-
 }
-
-
 
 int shmid;
 
@@ -85,14 +74,10 @@ void initClk()
         sleep(1);
 
         shmid = shmget(SHKEY, 4, 0444);
-
     }
 
     shmaddr = (int *)shmat(shmid, (void *)0, 0);
-
 }
-
-
 
 /*
 
@@ -108,8 +93,6 @@ void initClk()
 
  */
 
-
-
 void destroyClk(bool terminateAll)
 
 {
@@ -123,14 +106,10 @@ void destroyClk(bool terminateAll)
         shmctl(shmid, IPC_RMID, NULL);
 
         killpg(getpgrp(), SIGINT);
-
     }
-
 }
 
 struct block; // block to hold the free memory places
-
-
 
 struct block
 
@@ -141,12 +120,9 @@ struct block
     int end;
 
     struct block *next;
-
 };
 
 struct block *memory[11]; // because the max is 1024
-
-
 
 enum ProcessState
 
@@ -161,8 +137,6 @@ enum ProcessState
     terminated
 
 };
-
-
 
 struct Process
 
@@ -193,36 +167,28 @@ struct Process
     int size;
 
     enum ProcessState state;
-
 };
 
 struct ProcessNode
-
 {
 
     struct Process *process;
 
     struct ProcessNode *next;
-
 };
-
-
 
 union Semun
 
 {
 
-    int val;               /* Value for SETVAL */
+    int val; /* Value for SETVAL */
 
-    struct semid_ds *buf;  /* Buffer for IPC_STAT, IPC_SET */
+    struct semid_ds *buf; /* Buffer for IPC_STAT, IPC_SET */
 
     unsigned short *array; /* Array for GETALL, SETALL */
 
     struct seminfo *__buf; /* Buffer for IPC_INFO (Linux-specific) */
-
 };
-
-
 
 void down(int sem)
 
@@ -230,15 +196,11 @@ void down(int sem)
 
     struct sembuf op;
 
-
-
     op.sem_num = 0;
 
     op.sem_op = -1;
 
     op.sem_flg = !IPC_NOWAIT;
-
-
 
     if (semop(sem, &op, 1) == -1)
 
@@ -247,12 +209,8 @@ void down(int sem)
         perror("Error in down()");
 
         exit(-1);
-
     }
-
 }
-
-
 
 void up(int sem)
 
@@ -260,15 +218,11 @@ void up(int sem)
 
     struct sembuf op;
 
-
-
     op.sem_num = 0;
 
     op.sem_op = 1;
 
     op.sem_flg = !IPC_NOWAIT;
-
-
 
     if (semop(sem, &op, 1) == -1)
 
@@ -277,14 +231,10 @@ void up(int sem)
         perror("Error in up()");
 
         exit(-1);
-
     }
-
 }
 
 //-------------------------- memory -----------------------------//
-
-
 
 void initmemory()
 
@@ -305,22 +255,16 @@ void initmemory()
     {
 
         memory[i] = NULL;
-
     }
-
 }
 
-
-
-int allocatememory(struct Process *p,int time)
+int allocatememory(struct Process *p, int time)
 
 {
 
     int k = ceil(log2(p->size));
 
     int suitableindex = k;
-
-
 
     if (memory[k]) // the size is suitable for the process, so allocate it
 
@@ -329,7 +273,6 @@ int allocatememory(struct Process *p,int time)
         p->start = memory[k]->start; // take the first slot as it is sorted
 
         memory[k] = memory[k]->next;
-
     }
 
     else // the free size is greater than the process size
@@ -345,7 +288,6 @@ int allocatememory(struct Process *p,int time)
             if (suitableindex > 10)
 
                 return -1; // the required size is more than the max free size exist
-
         }
 
         p->start = memory[suitableindex]->start;
@@ -379,11 +321,9 @@ int allocatememory(struct Process *p,int time)
             memory[suitableindex + 1] = memory[suitableindex + 1]->next; // remove the slot
 
             suitableindex--;
-
         }
 
         memory[suitableindex + 1] = memory[suitableindex + 1]->next; // remove the slot assigned to the process
-
     }
 
     int allocatedsize = pow(2, k);
@@ -393,10 +333,7 @@ int allocatememory(struct Process *p,int time)
     // printf("At time %d allocated %d bytes for process %d from %d to %d\n",time,p->size,p->id,p->start,p->start + allocatedsize - 1);
 
     // printf("the allocated space:start and the end addresses are %d,%d\n", p->start, p->start + allocatedsize - 1); // you can let it here or print after allocation of a process
-
 }
-
-
 
 void freememory(int start, int size)
 
@@ -425,7 +362,6 @@ void freememory(int start, int size)
             {
 
                 memory[k] = memory[k]->next;
-
             }
 
             else
@@ -433,7 +369,6 @@ void freememory(int start, int size)
             {
 
                 prev = temp->next;
-
             }
 
             int min = start < buddy ? start : buddy; // get the minimum of the start and buddy to be the start of the new slot of double freedsize
@@ -441,13 +376,11 @@ void freememory(int start, int size)
             freememory(min, freedsize * 2);
 
             return;
-
         }
 
         prev = temp;
 
         temp = temp->next;
-
     }
 
     struct block *newslot = (struct block *)malloc(sizeof(struct block));
@@ -465,7 +398,6 @@ void freememory(int start, int size)
     {
 
         memory[k] = newslot;
-
     }
 
     else if (temp->start > start)
@@ -475,7 +407,6 @@ void freememory(int start, int size)
         newslot->next = temp;
 
         memory[k] = newslot;
-
     }
 
     else
@@ -487,76 +418,63 @@ void freememory(int start, int size)
         {
 
             temp = temp->next;
-
         }
 
         newslot->next = temp->next;
 
         temp->next = newslot;
-
     }
 
     // printf("At time %d freed %d bytes from process %d from %d to %d\n",time,p->size,p->id,start, start + freedsize - 1);
 
     // printf("the freed space: start and the end addresses are %d,%d\n", start, start + freedsize - 1); // after termination the process print this with start and end parameters of the processes
-
 }
 
-void printmemory(int time, int size, int id, int start, int end, int op) {
+void printmemory(int time, int size, int id, int start, int end, int op)
+{
 
     FILE *memorylog = fopen("memory.log", "a");
 
-    if (memorylog == NULL) {
+    if (memorylog == NULL)
+    {
 
         printf("Error opening file.\n");
 
         return;
-
     }
-
-
 
     int k = ceil(log2(size));
 
-
-
-    if (op == 1) {
+    if (op == 1)
+    {
 
         int allocatedsize = pow(2, k);
 
         fprintf(memorylog, "At time %d allocated %d bytes for process %d from %d to %d\n", time, size, id, start, start + allocatedsize - 1);
-
-    } else {
+    }
+    else
+    {
 
         int freedsize = pow(2, k);
 
         fprintf(memorylog, "At time %d freed %d bytes from process %d from %d to %d\n", time, size, id, start, start + freedsize - 1);
-
     }
 
-
-
     fclose(memorylog);
-
 }
 
-
-
 struct processnode
-
 {
 
-   struct Process*pp;
+    struct Process *pp;
 
-   struct processnode*next;
-
+    struct processnode *next;
 };
 
+struct processnode *head = NULL;
 
-
-struct processnode*head=NULL;
-
-void putinlist(struct Process *p) {
+void putinlist(struct Process *p)
+{
 
     struct processnode *newNode = (struct processnode *)malloc(sizeof(struct processnode));
 
@@ -564,35 +482,34 @@ void putinlist(struct Process *p) {
 
     newNode->next = NULL;
 
-
-
-    if (head == NULL || head->pp->size < p->size) {
+    if (head == NULL || head->pp->size < p->size)
+    {
 
         newNode->next = head;
 
         head = newNode;
-
-    } else {
+    }
+    else
+    {
 
         struct processnode *current = head;
 
-        while (current->next != NULL && current->next->pp->size > p->size) {
+        while (current->next != NULL && current->next->pp->size > p->size)
+        {
 
             current = current->next;
-
         }
 
         newNode->next = current->next;
-
         current->next = newNode;
-
     }
-
 }
 
-struct Process *getfromlist() {
+struct Process *getfromlist()
+{
 
-    if (head == NULL) {
+    if (head == NULL)
+    {
 
         return NULL; // List is empty
 
@@ -604,17 +521,13 @@ struct Process *getfromlist() {
 
     head = head->next;
 
+    temp->next=NULL;
     free(temp);
 
     return result;
-
 }
 
-
-
 //-------------------------- RR headers ------------------------//
-
-
 
 struct Queue
 
@@ -623,10 +536,7 @@ struct Queue
     struct ProcessNode *front;
 
     struct ProcessNode *rear;
-
 };
-
-
 
 void initializeQueue(struct Queue *q)
 
@@ -635,10 +545,7 @@ void initializeQueue(struct Queue *q)
     q->front = NULL;
 
     q->rear = NULL;
-
 }
-
-
 
 void enqueue(struct Queue *q, struct Process *p)
 
@@ -652,8 +559,6 @@ void enqueue(struct Queue *q, struct Process *p)
 
     newProcess->next = NULL;
 
-
-
     if (q->front == NULL)
 
     {
@@ -663,7 +568,6 @@ void enqueue(struct Queue *q, struct Process *p)
         q->front = newProcess;
 
         q->rear = newProcess;
-
     }
 
     else
@@ -675,12 +579,8 @@ void enqueue(struct Queue *q, struct Process *p)
         q->rear = newProcess;
 
         (q->rear)->next = NULL;
-
     }
-
 }
-
-
 
 struct Process *dequeue(struct Queue *q)
 
@@ -694,8 +594,6 @@ struct Process *dequeue(struct Queue *q)
 
         struct Process *p = (q->front)->process;
 
-
-
         if (q->front == q->rear)
 
         {
@@ -703,7 +601,6 @@ struct Process *dequeue(struct Queue *q)
             q->front = NULL;
 
             q->rear = NULL;
-
         }
 
         else
@@ -713,20 +610,15 @@ struct Process *dequeue(struct Queue *q)
             q->front = (q->front)->next;
 
             n->next = NULL;
-
         }
 
         return p;
-
     }
 
     else
 
         return NULL;
-
 }
-
-
 
 void displayQ(struct Queue q)
 
@@ -745,7 +637,6 @@ void displayQ(struct Queue q)
         printf("processID:%d\n", (it->process)->id);
 
         it = it->next;
-
     }
 
     if (it != NULL)
@@ -753,10 +644,7 @@ void displayQ(struct Queue q)
         printf("processID:%d\n", (it->process)->id);
 
     return;
-
 }
-
-
 
 bool isEmpty(struct Queue q)
 
@@ -769,36 +657,25 @@ bool isEmpty(struct Queue q)
     else
 
         return false;
-
 }
 
-
-
 // -----------------------------------------Priority Queue Data Structure ------------------------------
-
-
 
 struct priority_Queue
 
 {
 
     struct ProcessNode *front;
-
 };
-
-
 
 void initializePriorityQueue(struct priority_Queue *q)
 
 {
 
     q->front = NULL;
-
 }
 
 // enqueue dequeue peek isempty display
-
-
 
 void priority_enqueue(struct priority_Queue *q, struct Process *p, int op)
 
@@ -823,7 +700,6 @@ void priority_enqueue(struct priority_Queue *q, struct Process *p, int op)
             newProcess->next = q->front;
 
             q->front = newProcess;
-
         }
 
         else
@@ -839,9 +715,7 @@ void priority_enqueue(struct priority_Queue *q, struct Process *p, int op)
             newProcess->next = temp->next;
 
             temp->next = newProcess;
-
         }
-
     }
 
     if (op == 1)
@@ -855,7 +729,6 @@ void priority_enqueue(struct priority_Queue *q, struct Process *p, int op)
             newProcess->next = q->front;
 
             q->front = newProcess;
-
         }
 
         else
@@ -871,14 +744,9 @@ void priority_enqueue(struct priority_Queue *q, struct Process *p, int op)
             newProcess->next = temp->next;
 
             temp->next = newProcess;
-
         }
-
     }
-
 }
-
-
 
 struct Process *priority_peek(struct priority_Queue *q)
 
@@ -891,10 +759,7 @@ struct Process *priority_peek(struct priority_Queue *q)
     else
 
         return NULL;
-
 }
-
-
 
 struct Process *priority_dequeue(struct priority_Queue *q)
 
@@ -912,35 +777,24 @@ struct Process *priority_dequeue(struct priority_Queue *q)
 
         temp2->next = NULL;
 
-
-
         return temp;
-
     }
 
     return NULL;
-
 }
-
-
 
 bool priority_isempty(struct priority_Queue *q)
 
 {
 
     return (q->front == NULL);
-
 }
-
-
 
 void priority_display(struct priority_Queue *q)
 
 {
 
     struct ProcessNode *it = q->front;
-
-
 
     while (it)
 
@@ -949,12 +803,7 @@ void priority_display(struct priority_Queue *q)
         printf("process id = %d , arrival time = %d , priority = %d \n", it->process->priority, it->process->id, it->process->arrival_time);
 
         it = it->next;
-
     }
-
 }
 
-
-
 //------------------------------------------------------------------------
-
