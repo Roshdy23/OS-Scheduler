@@ -8,7 +8,7 @@ A CPU scheduler determines an order for the execution of its scheduled processes
 It decides which process will run according to a certain data structure that keeps track of the processes in the system and their status.  
 
 ### to use this project follow the below instructions:-  
-1- Clone the project  
+1- Clone this repo  
 
 2- Go to the project folder and write this command in terminal to compile the code  
 
