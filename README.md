@@ -1,5 +1,5 @@
 # Platform:  
-![Linux Badge](https://img.shields.io/badge/Linux-OS-green) ![C  Badge](https://img.shields.io/C/v/:packageName)
+![Linux Badge](https://img.shields.io/badge/Linux-OS-green) ![C  Badge](https://img.shields.io/badge/C)
 
 
 
