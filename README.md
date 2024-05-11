@@ -1,5 +1,6 @@
-## Platform  
-[![Linux][Linux]][Linux-url] [![C][C]][C-url]  
+# Platform  
+![Linux Badge](https://img.shields.io/badge/Linux-OS-green)
+
 
 # OS Scheduler:  
 A CPU scheduler determines an order for the execution of its scheduled processes with memory allocation capabilities.  
