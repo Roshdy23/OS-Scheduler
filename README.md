@@ -9,6 +9,7 @@ It decides which process will run according to a certain data structure that kee
 
 ### to use this project follow the below instructions:-  
 1- Clone the project  
+
 2- Go to the project folder and write this command in terminal to compile the code  
 
 ```
